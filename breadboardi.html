@@ -1,0 +1,713 @@
+    <!DOCTYPE html>
+     
+    <html>
+    <head>
+        <title>Virtual Breadboard Simulator</title>
+        <meta charset="utf-8">
+
+        <script src="js/jquery.js"></script>
+        <script src="js/jquery-ui.js"></script>
+        <script src="js/jquery.bgiframe.js"></script>
+        <link rel="stylesheet" href="css/style.css"/>
+        <link rel="stylesheet" href="css/jquery-ui.css"/>
+
+        
+    </head>
+     
+    <body>
+    <div id="container">
+        <canvas id="myCanvas" width="1100" height="360" style="position: relative; left: 0; top: 0; z-index: 0;" ></canvas>
+          
+        <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1300px" height="360px" style="z-index:0; position:absolute;left:0;top:0" id="svgline"></svg>
+    </div>
+    <br><div style="text-align:center">
+        <button class="buttonInactive" id="addChip" href="#" style="" onclick="createChip()">Add Chip</button>
+        <button class="buttonInactive" id="addWire" href="#" style="" onclick="toggleWireButton()">Add Wire</button>
+        <button class="buttonInactive" id="addResistance" href="#" style="" onclick="toggleResistanceButton()">Add Resistor</button>
+        <button class="buttonInactive" id="addInductance" href="#" style="" onclick="toggleInductanceButton()">Add Inductor</button>
+        <button class="buttonInactive" id="addLED" href="#" style="" onclick="toggleLEDButton()">Add LED</button>
+        <button class="buttonInactive" id="del" href="#" style="" onclick="toggleDelButton()">Delete Mode</button>
+        <br>
+        <button id="submit" href="#" onclick="genJSON()">Submit</button>
+        <button id="reset" href="breadboard.html" onclick="window.location.reload(true)" >Reset</button><br>
+        
+    </div>
+    <div id="dialog" title="JSON Output" style="display:none"></div>
+
+        <script type="text/javascript">
+            var finalOutput;
+            var drawWire=0;
+            var wireInitial;
+            var drawResistance=0;
+            var resistanceInitial;
+            var drawLED=0;
+            var LEDInitial;
+            var drawInductance=0;
+            var inductanceInitial;
+
+            var chipNo=1;
+            var wireNo=1;
+            var resistanceNo=1;
+            var inductanceNo=1;
+            var LEDNo=1;
+            var deletemode=0;
+            var delIni;
+            
+
+            function approx_x(x){
+                return (Math.floor(x/10)*10+5) ;
+            }
+
+            function createChip(){
+                if(drawWire==1) 
+                {
+                    alert("First turn off the Add Wire Button");
+                    return;
+                }
+                if(drawResistance==1)
+                {
+                    alert("First turn off the Add Resistance Button");
+                    return;
+                }
+                if(drawInductance==1)
+                {
+                    alert("First turn off the Add Inductance Button");
+                    return;
+                }
+                if(drawLED==1)
+                {
+                    alert("First turn off the Add LED Button");
+                    return;
+                }
+                $("#container").append('<canvas id="chip'+chipNo+'" width="80" height="50" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>');
+                    var chipId= "chip"+chipNo;
+                    var chipcanvas = $("#"+chipId);
+                    var chipContext = chipcanvas.get(0).getContext("2d");
+                   
+                    
+                    current_x=5;
+                    chipContext.fillStyle="rgb(0,0,0)";
+                    chipContext.fillRect(0,10, 80, 30);
+                    for (var i = 0; i < 4; i++) {
+                        chipContext.fillStyle="rgb(208, 208, 208)";
+                        
+                        chipContext.fillRect(current_x,0,8,9);
+                        current_x=current_x+20;
+                    }
+                    current_x=5;
+                    chipContext.fillStyle="rgb(0,0,0)";
+                    for (var i = 0; i < 4; i++) {
+                        chipContext.fillStyle="rgb(208, 208, 208)";
+                        
+                        chipContext.fillRect(current_x,40,8,9);
+                        current_x=current_x+20;
+                    }
+                    chipContext.fillStyle="rgb(255,255,255)";
+                    chipContext.font = '20pt Calibri';
+                    chipContext.fillText('IC#'+chipNo, 17, 32);
+
+                    $("#"+chipId).draggable({ containment: [160,170,1060,170], scroll: false },{grid: [20,1]});
+                           $("#"+chipId).css("left","175px");
+                           $("#"+chipId).css("top","170px");
+
+                chipNo++;
+
+
+
+            }
+
+            $("#container").mousedown(function(e){
+                if(drawWire==1)
+                {
+                    wireInitial=e;
+                }
+                if(drawResistance==1)
+                {
+                    resistanceInitial=e;
+                }
+                if(drawInductance==1)
+                {
+                    inductanceInitial=e;
+                }
+                if(drawLED==1)
+                {
+                    LEDInitial=e;
+                }
+                if(deletemode==1)
+                {
+                    delIni=e;
+                }
+            });
+
+            function parseSVG(s) {
+                var div= document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+                div.innerHTML= '<svg xmlns="http://www.w3.org/2000/svg">'+s+'</svg>';
+                var frag= document.createDocumentFragment();
+                while (div.firstChild.firstChild)
+                    frag.appendChild(div.firstChild.firstChild);
+                return frag;
+            }
+
+            $("#container").mouseup(function(e){
+                if(drawWire==1)
+                {
+                    var wireFinal=e;
+
+                    x1=approx_x(wireInitial.pageX);
+                    y1=approx_x(wireInitial.pageY);
+                    x2=approx_x(wireFinal.pageX);
+                    y2=approx_x(wireFinal.pageY);
+
+                    if(x1==x2 && y1==y2)
+                    {
+                        alert("It is meaningless to insert both the ends of wire to the same point.");
+                        return;
+                    }
+                    document.getElementById('svgline').appendChild(parseSVG('<line id=wire'+wireNo+' x1='+x1+' y1='+y1+' x2='+x2+' y2='+y2+' style="stroke:rgb(255,0,0);stroke-width:2"/>'));
+                    wireNo++;
+                    
+                }
+                if(drawResistance==1)
+                {
+                    var resistanceFinal=e;
+                    
+                    x1=approx_x(resistanceInitial.pageX);
+                    y1=approx_x(resistanceInitial.pageY);
+                    x2=approx_x(resistanceFinal.pageX);
+                    y2=approx_x(resistanceFinal.pageY);
+                    if(x1==x2 && y1==y2)
+                    {
+                        alert("Can't insert both the legs of resistor to the same point.");
+                        return;
+                    }
+                    var ohms=prompt("Enter the value of Resistance in ohms","Resistance in Ohms");
+                    ohms=parseFloat(ohms);
+                    if(isNaN(ohms) || ohms=='' || ohms<=0)
+                    {
+                        alert("Invalid value of resistance!");
+                        return;
+                    }
+                    document.getElementById('svgline').appendChild(parseSVG('<line dataohm="'+ohms+'"id=resistance'+resistanceNo+' x1='+x1+' y1='+y1+' x2='+x2+' y2='+y2+' style="stroke:rgb(0,255,0);stroke-width:2"/>'));
+                    //to draw the box of the resistor
+                    var centerX=x1-(x1-x2)/2;
+                    var centerY=y1-(y1-y2)/2;
+                    var slope=Math.atan((y2-y1)/(x2-x1));
+                    var rectX1=centerX-5*Math.sin(slope)+10*Math.cos(slope);
+                    var rectY1=centerY+5*Math.cos(slope)+10*Math.sin(slope);
+                    var rectX2=centerX+10*Math.cos(slope)+5*Math.sin(slope);
+                    var rectY2=centerY+10*Math.sin(slope)-5*Math.cos(slope);
+                    var rectX3=centerX+5*Math.sin(slope)-10*Math.cos(slope);
+                    var rectY3=centerY-5*Math.cos(slope)-10*Math.sin(slope);
+                    var rectX4=centerX-10*Math.cos(slope)-5*Math.sin(slope);
+                    var rectY4=centerY-10*Math.sin(slope)+5*Math.cos(slope);
+                    document.getElementById('svgline').appendChild(parseSVG('<polygon id=resistanceBox'+resistanceNo+' points="'+rectX1+','+rectY1+' '+rectX2+','+rectY2+' '+rectX3+','+rectY3+' '+rectX4+','+rectY4+'" style="fill:blue; stroke:lime; stroke-width:1"/>'));    
+                    resistanceNo++;
+                }
+                if(drawInductance==1)
+                {
+                    var inductanceFinal=e;
+                    
+                    x1=approx_x(inductanceInitial.pageX);
+                    y1=approx_x(inductanceInitial.pageY);
+                    x2=approx_x(inductanceFinal.pageX);
+                    y2=approx_x(inductanceFinal.pageY);
+                    if(x1==x2 && y1==y2)
+                    {
+                        alert("Can't insert both the legs of inductor to the same point.");
+                        return;
+                    }
+                    var mhos=prompt("Enter the value of Inductance in mhos","Inductance in Ohms");
+                    mhos=parseFloat(mhos);
+                    if(isNaN(mhos) || mhos=='' || mhos<=0)
+                    {
+                        alert("Invalid value of inductance!");
+                        return;
+                    }
+                    document.getElementById('svgline').appendChild(parseSVG('<line datamho="'+mhos+'"id=inductance'+inductanceNo+' x1='+x1+' y1='+y1+' x2='+x2+' y2='+y2+' style="stroke:rgb(139,0,139);stroke-width:2"/>'));
+                    //to draw the box of the resistor
+                    var centerX=x1-(x1-x2)/2;
+                    var centerY=y1-(y1-y2)/2;
+                    var slope=Math.atan((y2-y1)/(x2-x1));
+                    var rectX1=centerX-5*Math.sin(slope)+10*Math.cos(slope);
+                    var rectY1=centerY+5*Math.cos(slope)+10*Math.sin(slope);
+                    var rectX2=centerX+10*Math.cos(slope)+5*Math.sin(slope);
+                    var rectY2=centerY+10*Math.sin(slope)-5*Math.cos(slope);
+                    var rectX3=centerX+5*Math.sin(slope)-10*Math.cos(slope);
+                    var rectY3=centerY-5*Math.cos(slope)-10*Math.sin(slope);
+                    var rectX4=centerX-10*Math.cos(slope)-5*Math.sin(slope);
+                    var rectY4=centerY-10*Math.sin(slope)+5*Math.cos(slope);
+                    document.getElementById('svgline').appendChild(parseSVG('<polygon id=inductanceBox'+inductanceNo+' points="'+rectX1+','+rectY1+' '+rectX2+','+rectY2+' '+rectX3+','+rectY3+' '+rectX4+','+rectY4+'" style="fill:rgb(255,215,0); stroke:black; stroke-width:1"/>'));    
+                    inductanceNo++;
+                }
+                if(drawLED==1)
+                {
+                    var LEDFinal=e;
+                    x1=approx_x(LEDInitial.pageX);
+                    y1=approx_x(LEDInitial.pageY);
+                    x2=approx_x(LEDFinal.pageX);
+                    y2=approx_x(LEDFinal.pageY);
+
+                    if(x1==x2 && y1==y2)
+                    {
+                        alert("Can't insert both the legs of LED to the same point.");
+                        return;
+                    }
+                    document.getElementById('svgline').appendChild(parseSVG('<line id=LED'+LEDNo+' x1='+x1+' y1='+y1+' x2='+x2+' y2='+y2+' style="stroke:rgb(0,0,255);stroke-width:2"/>'));
+                    //to draw the circular LED
+                    var centerX=x1-(x1-x2)/2;
+                    var centerY=y1-(y1-y2)/2;
+                    document.getElementById('svgline').appendChild(parseSVG('<circle id=LEdcircle'+LEDNo+' cx="'+centerX+'" cy="'+centerY+'" r="5" stroke="black"  stroke-width="1" fill="red"/>'));    
+                    LEDNo++;
+
+                }
+                if(deletemode==1)
+                {
+                    console.log(delIni);
+                   
+                    var delFin=e;
+                     console.log(delFin);
+                    x1=approx_x(delIni.pageX);
+                    y1=approx_x(delIni.pageY);
+                    x2=approx_x(delFin.pageX);
+                    y2=approx_x(delFin.pageY);
+                    var id;
+                    Things=$("line");
+                    for (var i = Things.length - 1; i >= 0; i--) {
+                        if(Things[i].x1.baseVal.value==x1)
+                        {
+                            if(Things[i].y1.baseVal.value==y1 && Things[i].x2.baseVal.value==x2 && Things[i].y2.baseVal.value==y2)
+                            {
+                                console.log(Things[i].id[0]);
+                                if(Things[i].id[0]=="w"){
+                                        $("#"+Things[i].id).remove();
+                                }
+                                
+                                if(Things[i].id[0]=="r")
+                                {
+                                  
+                                    $("#resistanceBox"+Things[i].id[Things[i].id.length -1]).remove();
+                                    $("#"+Things[i].id).remove();
+
+                                }
+                                if(Things[i].id[0]=="i")
+                                {
+                                  
+                                    $("#inductanceBox"+Things[i].id[Things[i].id.length -1]).remove();
+                                    $("#"+Things[i].id).remove();
+
+                                }
+                                if(Things[i].id[0]=="L")
+                                {
+                                  
+                                    $("#LEdcircle"+Things[i].id[Things[i].id.length -1]).remove();
+                                    $("#"+Things[i].id).remove();
+
+                                }
+
+                                return;
+                            }
+                        }
+                        if(Things[i].x2.baseVal.value==x1)
+                        {
+                            if(Things[i].y2.baseVal.value==y1 && Things[i].x1.baseVal.value==x2 && Things[i].y1.baseVal.value==y2)
+                            {
+                                console.log(Things[i].id[0]);
+                                if(Things[i].id[0]=="w"){
+                                        $("#"+Things[i].id).remove();
+                                }
+                                if(Things[i].id[0]=="r")
+                                {
+                                  
+                                    $("#resistanceBox"+Things[i].id[Things[i].id.length -1]).remove();
+                                    $("#"+Things[i].id).remove();
+
+                                }
+                                if(Things[i].id[0]=="i")
+                                {
+                                  
+                                    $("#inductanceBox"+Things[i].id[Things[i].id.length -1]).remove();
+                                    $("#"+Things[i].id).remove();
+
+                                }
+                                if(Things[i].id[0]=="L")
+                                {
+                                  //  console.log("#LEdcircle"+Things[i].id[Things[i].id.length -1]);
+                                    $("#LEdcircle"+Things[i].id[Things[i].id.length -1]).remove();
+                                    $("#"+Things[i].id).remove();
+
+                                }
+                                return;
+                            }
+                        }
+                    };
+                }
+            });
+
+                        $(document).ready(function() {
+
+                            var canvas = $("#myCanvas");
+                            var context = canvas.get(0).getContext("2d");
+                            var current_x=70;
+                            context.strokeStyle = "rgb(208, 208, 208)";
+                            context.fillStyle = "rgb(88, 88, 88)";
+                            for (var j = 0; j < 8; j++) {
+                                
+                                for (var i = 0; i < 5; i++) {
+                                    current_x= current_x+20;
+                                    context.fillRect(current_x,40, 10, 10);
+                                };
+                                current_x=current_x + 20;
+                            };
+                            current_x=70;
+                            for (var j = 0; j < 8; j++) {
+                                
+                                for (var i = 0; i < 5; i++) {
+                                    current_x= current_x+20;
+                                    context.fillRect(current_x,60, 10, 10);
+                                };
+                                current_x=current_x + 20;
+                            };
+                            current_x=70;
+                            context.lineWidth=3;
+                            context.beginPath(); // Start the path
+                            context.moveTo(90, 80); // Set the path origin
+                            context.lineTo(50*21-5, 80); // Set the path destination
+                            context.closePath(); // Close the path
+                            context.stroke(); // Outline the path
+
+                            for (var j = 0; j <5; j++) {
+                                
+                                for (var i = 0; i < 48; i++) {
+                                        current_x= current_x+20;
+                                        context.fillRect(current_x,90+20*j, 10, 10);
+                                    }; 
+                                current_x=70;
+
+                            };
+
+                            context.lineWidth=5;
+                            context.beginPath(); // Start the path
+                            context.moveTo(90, 195); // Set the path origin
+                            context.lineTo(50*21-5, 195); // Set the path destination
+                            context.closePath(); // Close the path
+                            context.stroke(); // Outline the path
+
+                            
+                            context.fillStyle="rgb(88,88,88)";
+                            for (var j = 0; j <5; j++) {
+                                
+                                for (var i = 0; i < 48; i++) {
+                                        current_x= current_x+20;
+                                        context.fillRect(current_x,210+20*j, 10, 10);
+                                    }; 
+                                current_x=70;
+
+                            };
+                            current_x=70;
+                            context.lineWidth=3;
+                            context.beginPath(); // Start the path
+                            context.moveTo(90, 310); // Set the path origin
+                            context.lineTo(50*21-5, 310); // Set the path destination
+                            context.closePath(); // Close the path
+                            context.stroke(); // Outline the path
+                            
+                            current_x=70;
+                            for (var j = 0; j < 8; j++) {
+                                
+                                for (var i = 0; i < 5; i++) {
+                                    current_x= current_x+20;
+                                    context.fillRect(current_x,320, 10, 10);
+                                };
+                                current_x=current_x + 20;
+                            };
+                            current_x=70;
+                            
+                            for (var j = 0; j < 8; j++) {
+                                
+                                for (var i = 0; i < 5; i++) {
+                                    current_x= current_x+20;
+                                    context.fillRect(current_x,340, 10, 10);
+                                };
+                                current_x=current_x + 20;
+                            };
+                            
+                            //power Suppy creation
+
+                            context.fillStyle="rgb(88,88,88)";
+                            context.fillRect(0,165, 30, 60);
+                            context.font = '20pt Calibri';
+                            context.fillStyle="rgb(200,200,200)";
+                            
+                            context.lineWidth=2;
+                            context.strokeStyle = "rgb(255, 0, 0)";
+                            context.beginPath(); // Start the path
+                            context.moveTo(30, 175); // Set the path origin
+                            context.lineTo(50, 175); // Set the path destination
+                            context.fillRect(50,170, 10, 10);
+                            context.closePath(); // Close the path
+                            context.stroke(); // Outline the path
+                            context.fillText('+', 15, 182);
+
+                            context.strokeStyle = "rgb(0, 255, 0)";
+                            context.beginPath(); // Start the path
+                            context.moveTo(30, 195); // Set the path origin
+                            context.lineTo(50, 195); // Set the path destination
+                            context.fillRect(50,190, 10, 10);
+                            context.closePath(); // Close the path
+                            context.stroke(); // Outline the path
+                            context.fillText('0', 15, 202);
+
+                            context.strokeStyle = "rgb(0, 0, 255)";
+                            context.beginPath(); // Start the path
+                            context.moveTo(30, 215); // Set the path origin
+                            context.lineTo(50, 215); // Set the path destination
+                            context.fillRect(50,210, 10, 10);
+                            context.closePath(); // Close the path
+                            context.stroke(); // Outline the path
+                            context.fillText('-', 15, 222);
+
+                      });
+                        
+                function toggleDelButton(){
+                    $this=$("#del");
+                    if(drawInductance==1 || drawResistance==1 || drawWire==1 || drawLED==1)
+                    {
+                        alert("First Deactivate the Add Mode");
+                        return;   
+                    }
+                    if(deletemode==1)
+                    {
+                        $this.css('background-color','white');
+                        deletemode=0;
+
+                    }else
+                    {
+                        $this.css('background-color','red');
+                        deletemode=1;
+                    }
+                }
+                
+
+                function toggleWireButton(){
+                    $this=$("#addWire");
+                    if(deletemode==1)
+                    {
+                        alert("First Deactivate the Delete Mode");
+                        return;
+                    }
+                    if(drawWire==1)
+                    {
+                        $this.css('background-color','white');
+                        drawWire=0;
+                    }
+                    else 
+                        if(drawResistance==1)
+                        {
+                            alert("First turn off the Add Resistor Button");
+                            return;
+                        }
+                        else
+                           if(drawLED==1)
+                            {
+                                alert("First turn off the Add LED Button");
+                                return;
+                            }
+                            else 
+                            {
+                                if(drawInductance==1)
+                                {
+                                    alert("First turn off the Add Inductance Button");
+                                    return;
+                                }
+                                $this.css('background-color','red');
+                                drawWire=1;
+                            }
+                };
+
+                function toggleResistanceButton(){
+                    $this=$("#addResistance");
+                    if(deletemode==1)
+                    {
+                        alert("First Deactivate the Delete Mode");
+                        return;
+                    }
+                    if(drawResistance==1)
+                    {
+                        $this.css('background-color','white');
+                        drawResistance=0;
+                    }
+                    else
+                        if(drawWire==1)
+                        {
+                            alert("First turn off the Add Wire Button");
+                            return;
+                        }
+                        else
+                            if(drawLED==1)
+                            {
+                                alert("First turn off the Add LED Button");
+                                return;
+                            }
+                            else
+                            {
+                                if(drawInductance==1)
+                                {
+                                    alert("First turn off the Add Inductance Button");
+                                    return;
+                                }
+                                $this.css('background-color','red');
+                                drawResistance=1;
+                            }          
+                };
+
+                function toggleInductanceButton(){
+                    $this=$("#addInductance");
+                    if(deletemode==1)
+                    {
+                        alert("First Deactivate the Delete Mode");
+                        return;
+                    }
+                    if(drawInductance==1)
+                    {
+                        $this.css('background-color','white');
+                        drawInductance=0;
+                    }
+                    else
+                        if(drawWire==1)
+                        {
+                            alert("First turn off the Add Wire Button");
+                            return;
+                        }
+                        else
+                        
+                           if(drawLED==1)
+                            {
+                                alert("First turn off the Add LED Button");
+                                return;
+                            }
+                            else
+                            {
+                                if(drawResistance==1)
+                                {
+                                    alert("First turn off the Add Resistor Button");
+                                    return;
+                                }
+                                $this.css('background-color','red');
+                                drawInductance=1;
+                            }
+                             
+                          
+                };
+                function toggleLEDButton(){
+                    $this=$("#addLED");
+                    if(deletemode==1)
+                    {
+                        alert("First Deactivate the Delete Mode");
+                        return;
+                    }
+                    if(drawLED==1)
+                        {
+                            $this.css('background-color','white');
+                            drawLED=0;
+                        }
+                    else
+                        if(drawWire==1)
+                        {
+                            alert("First turn off the Add Wire Button");
+                            return;
+                        }
+                        else
+                        
+                           if(drawResistance==1)
+                            {
+                                alert("First turn off the Add Resistor Button");
+                                return;
+                            }
+                            else
+                            {
+                                if(drawInductance==1)
+                                {
+                                    alert("First turn off the Add Inductance Button");
+                                    return;
+                                }
+                                $this.css('background-color','red');
+                                drawLED=1;
+                            } 
+                          
+                };
+
+                function genJSON() {
+                    var wires= $("[id^='wire']");
+                    var wiresOut=$.map(wires,function(wire){
+                        return {
+                            id: wire.id,
+                            x1: wire.x1.baseVal.value,
+                            y1: wire.y1.baseVal.value,
+                            x2: wire.x2.baseVal.value,
+                            y2: wire.y2.baseVal.value
+                        };
+                    });
+                    var LEDs= $("[id^='LED']");
+                    var LEDOut=$.map(LEDs,function(LED){
+                        return {
+                            id: LED.id,
+                            x1: LED.x1.baseVal.value,
+                            y1: LED.y1.baseVal.value,
+                            x2: LED.x2.baseVal.value,
+                            y2: LED.y2.baseVal.value
+                        };
+                    });
+
+                    var resistances= $("line[id^='resistance']");
+                    var resistanceOut=$.map(resistances,function(resistance){
+                        var rval=$("#"+resistance.id).attr("dataohm");
+                        return {
+
+                            id: resistance.id,
+                            val: rval,
+                            x1: resistance.x1.baseVal.value,
+                            y1: resistance.y1.baseVal.value,
+                            x2: resistance.x2.baseVal.value,
+                            y2: resistance.y2.baseVal.value,
+                        };
+                    });
+
+                    var inductances= $("line[id^='inductance']");
+                    var inductanceOut=$.map(inductances,function(inductance){
+                        var rval=$("#"+inductance.id).attr("datamho");
+                        return {
+
+                            id: inductance.id,
+                            val: rval,
+                            x1: inductance.x1.baseVal.value,
+                            y1: inductance.y1.baseVal.value,
+                            x2: inductance.x2.baseVal.value,
+                            y2: inductance.y2.baseVal.value,
+                        };
+                    });
+
+                    var chips= $("[id^='chip']");
+                    var chipOut=$.map(chips,function(chip){
+                        return {
+                            id: chip.id,
+                            x1: chip.style.left,
+                            y1: "170px"
+                        };
+                    });
+
+                        finalOutput={
+                        chips: chipOut,
+                        wires: wiresOut,
+                        resistances: resistanceOut,
+                        inductances: inductanceOut,
+                        leds: LEDOut
+                        }
+                        console.log(finalOutput);
+                    
+                    var finalstringoutput=JSON.stringify(finalOutput);
+                    $("#dialog").html(finalstringoutput);
+                    $( "#dialog" ).dialog();   
+                }
+        </script>
+    </body>
+    </html>
